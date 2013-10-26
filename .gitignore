@@ -10,6 +10,7 @@ tags
 TAGS
 *.xcworkspace
 *.xcuserdatad
+*.DS_Store
 platform/win32/*.user
 platform/win32/*.ncb
 platform/win32/*.suo

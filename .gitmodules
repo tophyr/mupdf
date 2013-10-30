@@ -16,3 +16,6 @@
 [submodule "thirdparty/curl"]
 	path = thirdparty/curl
 	url = git://git.ghostscript.com/thirdparty/curl.git
+[submodule "platform/android/jni/android-external-openssl"]
+	path = platform/android/jni/android-external-openssl
+	url = https://github.com/tophyr/android-external-openssl.git

@@ -1,4 +1,5 @@
 package com.artifex.mupdfdemo;
+import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 
 import android.content.Context;
@@ -66,6 +67,11 @@ public class MuPDFCore
 	private native void destroying();
 	private native boolean hasChangesInternal();
 	private native void saveInternal();
+	private native void signInternal(byte[] cert);
+	
+	public void sign(X509Certificate cert) {
+		signInternal(cert.getSignature());
+	}
 
 	public static native boolean javascriptSupported();
 

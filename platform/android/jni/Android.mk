@@ -7,6 +7,7 @@ ifdef NDK_PROFILER
 include android-ndk-profiler.mk
 endif
 
+include $(TOP_LOCAL_PATH)/android-external-openssl/crypto/Crypto.mk
 include $(TOP_LOCAL_PATH)/Core.mk
 include $(TOP_LOCAL_PATH)/ThirdParty.mk
 

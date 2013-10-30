@@ -12,12 +12,13 @@ ifdef NDK_PROFILER
 LOCAL_CFLAGS += -pg -DNDK_PROFILER
 endif
 endif
-LOCAL_CFLAGS += -DAA_BITS=8
+LOCAL_CFLAGS += -DAA_BITS=8 -DHAVE_OPENSSL
 ifdef MEMENTO
 LOCAL_CFLAGS += -DMEMENTO -DMEMENTO_LEAKONLY
 endif
 
 LOCAL_C_INCLUDES := \
+	jni/android-external-openssl/include \
 	../../thirdparty/jbig2dec \
 	../../thirdparty/openjpeg/src/lib/openjp2 \
 	../../thirdparty/jpeg \
@@ -58,6 +59,7 @@ LOCAL_SRC_FILES += \
 endif
 
 LOCAL_LDLIBS    := -lm -llog -ljnigraphics
+LOCAL_STATIC_LIBRARIES := libcrypto-static
 
 LOCAL_SRC_FILES := $(addprefix ../, $(LOCAL_SRC_FILES))
 

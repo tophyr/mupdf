@@ -593,6 +593,45 @@ static void update_changed_rects(globals *glo, page_cache *pc, pdf_document *ido
 }
 
 JNIEXPORT jboolean JNICALL
+JNI_FN(MuPDFCore_sign)(JNIEnv *env, jobject thiz, jbyteArray cert)
+{
+	globals *glo = get_globals(env, thiz);
+	fz_context *ctx = glo->ctx;
+	fz_document *doc = glo->doc;
+	pdf_annot *sig_annot;
+	pdf_page *page;
+	jbyte *certbytes;
+	pdf_signer *signer;
+
+	fz_var(sig_annot);
+	fz_var(page);
+	fz_var(certbytes);
+	fz_var(signer);
+	fz_try(ctx)
+	{
+		page = pdf_load_page(doc, 0);
+		sig_annot = pdf_create_annot(doc, page, FZ_ANNOT_WIDGET);
+		sig_annot->widget_type = PDF_WIDGET_TYPE_SIGNATURE;
+
+		certbytes = (*env)->GetByteArrayElements(env, cert, NULL);
+		signer = pdf_parse_pfx(ctx, (void*)certbytes, (*env)->GetArrayLength(env, cert), NULL);
+		pdf_sign_signature_with_signer(doc, (pdf_widget*)sig_annot, signer);
+	}
+	fz_always(ctx)
+	{
+		(*env)->ReleaseByteArrayElements(env, cert, certbytes, JNI_ABORT);
+		certbytes = NULL;
+		pdf_drop_signer(signer);
+		signer = NULL;
+	}
+	fz_catch(ctx)
+	{
+		pdf_delete_annot(doc, page, sig_annot);
+		// throw java exception
+	}
+}
+
+JNIEXPORT jboolean JNICALL
 JNI_FN(MuPDFCore_drawPage)(JNIEnv *env, jobject thiz, jobject bitmap,
 		int pageW, int pageH, int patchX, int patchY, int patchW, int patchH)
 {

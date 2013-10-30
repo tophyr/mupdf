@@ -2,6 +2,7 @@
 
 #ifdef HAVE_OPENSSL
 
+#include <sys/stat.h>
 #include "openssl/err.h"
 #include "openssl/bio.h"
 #include "openssl/asn1.h"
@@ -424,6 +425,48 @@ static void add_from_bags(X509 **pX509, EVP_PKEY **pPkey, STACK_OF(PKCS12_SAFEBA
 
 pdf_signer *pdf_read_pfx(fz_context *ctx, char *pfile, char *pw)
 {
+	FILE *f = NULL;
+	char *pfxdata = NULL;
+	pdf_signer *signer = NULL;
+
+	fz_var(f);
+	fz_var(pfxdata);
+	fz_var(signer);
+	fz_try(ctx)
+	{
+		f = fopen(pfile, "r");
+		if (f == NULL)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "Can't open pfx file: %s", pfile);
+
+		struct stat s;
+		fstat(fileno(f), &s);
+		if (s.st_size <= 0)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "Invalid pfx file: %s", pfile);
+
+		pfxdata = malloc(s.st_size);
+		if (pfxdata == NULL)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "Unable to allocate memory for pfx file: %s", pfile);
+
+		if (fread(pfxdata, 1, s.st_size, f) != s.st_size)
+			fz_throw(ctx, FZ_ERROR_GENERIC, "Unable to read complete pfx file: %s. Incorrect file size?", pfile);
+
+		signer = pdf_parse_pfx(ctx, pfxdata, s.st_size, pw);
+	}
+	fz_always(ctx)
+	{
+		free(pfxdata);
+		fclose(f);
+	}
+	fz_catch(ctx)
+	{
+		fz_rethrow_message(ctx, "Error loading pfx file: %s", pfile);
+	}
+
+	return signer;
+}
+
+pdf_signer *pdf_parse_pfx(fz_context *ctx, void *pfxdata, int datalen, char *pw)
+{
 	BIO *pfxbio = NULL;
 	PKCS12 *p12 = NULL;
 	STACK_OF(PKCS7) *asafes;
@@ -448,17 +491,17 @@ pdf_signer *pdf_read_pfx(fz_context *ctx, char *pfile, char *pw)
 
 		ERR_clear_error();
 
-		pfxbio = BIO_new_file(pfile, "r");
+		pfxbio = BIO_new_mem_buf(pfxdata, datalen);
 		if (pfxbio == NULL)
-			fz_throw(ctx, FZ_ERROR_GENERIC, "Can't open pfx file: %s", pfile);
+			fz_throw(ctx, FZ_ERROR_GENERIC, "Can't open pfx data");
 
 		p12 = d2i_PKCS12_bio(pfxbio, NULL);
 		if (p12 == NULL)
-			fz_throw(ctx, FZ_ERROR_GENERIC, "Invalid pfx file: %s", pfile);
+			fz_throw(ctx, FZ_ERROR_GENERIC, "Invalid pfx data");
 
 		asafes = PKCS12_unpack_authsafes(p12);
 		if (asafes == NULL)
-			fz_throw(ctx, FZ_ERROR_GENERIC, "Invalid pfx file: %s", pfile);
+			fz_throw(ctx, FZ_ERROR_GENERIC, "Invalid pfx data");
 
 		/* Nothing in this for loop can fz_throw */
 		for (i = 0; i < sk_PKCS7_num(asafes); i++)
@@ -723,6 +766,24 @@ void pdf_sign_signature(pdf_document *doc, pdf_widget *widget, char *sigfile, ch
 {
 	fz_context *ctx = doc->ctx;
 	pdf_signer *signer = pdf_read_pfx(ctx, sigfile, password);
+
+	fz_try(ctx)
+	{
+		pdf_sign_signature_with_signer(doc, widget, signer);
+	}
+	fz_always(ctx)
+	{
+		pdf_drop_signer(signer);
+	}
+	fz_catch(ctx)
+	{
+		fz_rethrow(ctx);
+	}
+}
+
+void pdf_sign_signature_with_signer(pdf_document *doc, pdf_widget *widget, pdf_signer *signer)
+{
+	fz_context *ctx = doc->ctx;
 	pdf_designated_name *dn = NULL;
 	fz_buffer *fzbuf = NULL;
 
@@ -756,7 +817,6 @@ void pdf_sign_signature(pdf_document *doc, pdf_widget *widget, char *sigfile, ch
 	}
 	fz_always(ctx)
 	{
-		pdf_drop_signer(signer);
 		pdf_free_designated_name(dn);
 		fz_drop_buffer(ctx, fzbuf);
 	}
